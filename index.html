@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Warehouse Barcode Scanner</title>
+  <!-- Add the barcode library -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    /* New styles for the top navigation and barcode generation section */
+    .top-nav {
+      display: flex;
+      background: #333;
+      padding: 10px 20px;
+      margin-bottom: 20px;
+    }
+    .nav-item {
+      color: white;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    .nav-item.active {
+      background: #4CAF50;
+    }
+    .barcode-section {
+      display: none;
+      padding: 20px;
+    }
+    .barcode-controls {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .barcode-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+      page-break-after: always;
+    }
+    .barcode-item {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .barcode-img {
+      max-height: 80px;
+      margin: 0 auto;
+    }
+    .barcode-text {
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .print-button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    @media print {
+      .no-print {
+        display: none;
+      }
+      .barcode-grid {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+  <!-- Your existing styles remain unchanged -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f4f4f4;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    .form-group, .mode-toggle {
+      margin-bottom: 15px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    input, select {
+      padding: 8px;
+      font-size: 0.9rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .table-container {
+      max-height: 500px;
+      overflow-y: auto;
+      margin-top: 25px;
+      border: 1px solid #bbb;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 10;
+    }
+    th, td {
+      border: 1px solid #bbb;
+      padding: 6px;
+      text-align: center;
+    }
+    th {
+      background: #ddd;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+    }
+    .edit-btn, .delete-btn, .save-btn, .cancel-btn {
+      padding: 4px 8px;
+      margin: 2px;
+      font-size: 0.8rem;
+    }
+    .active-location {
+      background-color: #ffff99;
+      padding: 5px 10px;
+      font-weight: bold;
+      border-radius: 5px;
+      font-size: 0.9rem;
+    }
+    .delete-all-btn {
+      background-color: #ff4444;
+      color: white;
+      border: none;
+      margin-left: 10px;
+      display: none;
+    }
+    .download-options {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .download-options button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+    }
+    .date-fields {
+      display: flex;
+      gap: 10px;
+    }
+    .date-fields input {
+      width: 120px;
+    }
+    .small-col {
+      width: 40px;
+    }
+    .medium-col {
+      width: 80px;
+    }
+    .clear-date {
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.8rem;
+      margin-left: 5px;
+    }
+    .total-count {
+      background-color: #4CAF50;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 5px;
+      font-weight: bold;
+      margin-left: auto;
+    }
+    .search-container {
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .search-container input {
+      flex-grow: 1;
+      max-width: 300px;
+    }
+    .summary-container {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: #e9e9e9;
+      border-radius: 5px;
+    }
+    .summary-item {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<!-- New Top Navigation -->
+<div class="top-nav no-print">
+  <div class="nav-item active" onclick="showSection('stock-count')">Stock Count</div>
+  <div class="nav-item" onclick="window.open('https://fms.depoter.com/WMS/Data/Barcode/index.php', '_blank')">Barcode Generation</div>
+</div>
+
+<!-- Barcode Generation Section -->
+<div id="barcode-generation" class="barcode-section">
+  <div class="barcode-controls no-print">
+    <button onclick="downloadSampleExcel()">Download Sample Excel File</button>
+    <input type="file" id="excelUpload" accept=".xlsx, .xls" onchange="handleExcelUpload(event)" style="margin: 0 20px;">
+    <label>
+      <input type="checkbox" id="groupBySku"> Group by SKU (print one barcode per SKU)
+    </label>
+    <button class="print-button" onclick="window.print()">Print Barcodes</button>
+  </div>
+  <div id="barcode-container"></div>
+</div>
+
+<!-- Your existing dashboard (now wrapped in a section) -->
+<div id="stock-count">
+  <h2>📦 Warehouse Barcode Scanner</h2>
+
+  <div class="mode-toggle">
+    <label><input type="radio" name="mode" value="manual" checked onchange="changeMode()"> Manual</label>
+    <label><input type="radio" name="mode" value="direct" onchange="changeMode()"> Direct</label>
+    <span id="currentLocationDisplay" class="active-location" style="display:none;">Current Location: --</span>
+    <span id="totalCountDisplay" class="total-count">Total: 0</span>
+  </div>
+
+  <div class="form-group">
+    <input type="text" id="barcodeInput" placeholder="Enter Barcode / Location" />
+    <input type="number" id="qtyInput" placeholder="Qty" />
+    <input type="text" id="locationInput" placeholder="Location" />
+    <div class="date-fields">
+      <input type="date" id="productionDate" placeholder="Production Date" />
+      <input type="date" id="expiryDate" placeholder="Expiry Date" />
+      <button class="clear-date" onclick="clearExpiryDate()">Clear Expiry</button>
+    </div>
+    <button onclick="addEntry()">Add</button>
+    <div class="download-options">
+      <button onclick="downloadExcel('standard')">📥 Standard Report</button>
+      <button onclick="downloadExcel('consolidated')">📥 Consolidated Report</button>
+    </div>
+    <button id="deleteAllBtn" class="delete-all-btn" onclick="deleteSelected()">Delete All Selected</button>
+  </div>
+
+  <div class="search-container">
+    <input type="text" id="searchInput" placeholder="Search all fields..." oninput="filterTable()" />
+    <div class="summary-container">
+      <div class="summary-item">Total Barcode Count: <span id="uniqueBarcodeCount">0</span></div>
+      <div class="summary-item">Total Quantity Scanned: <span id="totalQuantityScanned">0</span></div>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th class="small-col"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"></th>
+          <th class="small-col">#</th>
+          <th>Barcode</th>
+          <th class="medium-col">Qty</th>
+          <th>Location</th>
+          <th>Production</th>
+          <th>Expiry</th>
+          <th class="medium-col">Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Your existing script remains unchanged -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  // New functions for barcode generation
+  function showSection(sectionId) {
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.toggle('active', item.textContent.includes(sectionId === 'stock-count' ? 'Stock Count' : 'Barcode Generation'));
+    });
+    document.getElementById('stock-count').style.display = sectionId === 'stock-count' ? 'block' : 'none';
+    document.getElementById('barcode-generation').style.display = sectionId === 'barcode-generation' ? 'block' : 'none';
+  }
+
+  function downloadSampleExcel() {
+    const sampleData = [
+      ["SKU", "Barcode", "Quantity"],
+      ["SKU001", "10000001", 5],
+      ["SKU002", "10000002", 3],
+      ["SKU003", "10000003", 10]
+    ];
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(sampleData);
+    XLSX.utils.book_append_sheet(wb, ws, "Sample Barcodes");
+    XLSX.writeFile(wb, "barcode_sample.xlsx");
+  }
+
+  function handleExcelUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+      // Process the data (skip header row)
+      const barcodeData = [];
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (row.length >= 3) {
+          const sku = row[0]?.toString() || '';
+          const barcode = row[1]?.toString() || '';
+          const qty = parseInt(row[2]) || 1;
+          
+          if (barcode) {
+            barcodeData.push({ sku, barcode, qty });
+          }
+        }
+      }
+
+      generateBarcodes(barcodeData);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function generateBarcodes(data) {
+    const container = document.getElementById('barcode-container');
+    container.innerHTML = '';
+    
+    const groupBySku = document.getElementById('groupBySku').checked;
+    const processedData = groupBySku ? processGroupedData(data) : processUngroupedData(data);
+    
+    // Split into pages (44 barcodes per page)
+    const itemsPerPage = 44;
+    const pageCount = Math.ceil(processedData.length / itemsPerPage);
+    
+    for (let page = 0; page < pageCount; page++) {
+      const pageData = processedData.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
+      const grid = document.createElement('div');
+      grid.className = 'barcode-grid';
+      
+      pageData.forEach(item => {
+        const barcodeItem = document.createElement('div');
+        barcodeItem.className = 'barcode-item';
+        
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'barcode-img');
+        svg.setAttribute('id', `barcode-${item.barcode}`);
+        
+        barcodeItem.appendChild(svg);
+        
+        const text = document.createElement('div');
+        text.className = 'barcode-text';
+        text.textContent = `${item.sku ? item.sku + ' - ' : ''}${item.barcode}`;
+        barcodeItem.appendChild(text);
+        
+        grid.appendChild(barcodeItem);
+        
+        // Generate the barcode
+        JsBarcode(`#barcode-${item.barcode}`, item.barcode, {
+          format: "CODE128",
+          lineColor: "#000",
+          width: 1,
+          height: 50,
+          displayValue: false
+        });
+      });
+      
+      container.appendChild(grid);
+    }
+  }
+
+  function processGroupedData(data) {
+    // Group by SKU and barcode, sum quantities
+    const grouped = {};
+    data.forEach(item => {
+      const key = `${item.sku}_${item.barcode}`;
+      if (!grouped[key]) {
+        grouped[key] = { ...item };
+      } else {
+        grouped[key].qty += item.qty;
+      }
+    });
+    return Object.values(grouped);
+  }
+
+  function processUngroupedData(data) {
+    // Create one barcode per quantity
+    const result = [];
+    data.forEach(item => {
+      for (let i = 0; i < item.qty; i++) {
+        result.push({ ...item, qty: 1 });
+      }
+    });
+    return result;
+  }
+
+  // Your existing JavaScript code remains unchanged
+  let entries = JSON.parse(localStorage.getItem('warehouseEntries') || '[]');
+  let currentMode = "manual";
+  let currentLocation = "";
+  let editIndex = -1;
+  let serialNumber = entries.length > 0 ? Math.max(...entries.map(e => e.serialNumber || 0)) + 1 : 1;
+  let filteredEntries = [...entries]; // Copy of entries for filtering
+
+  // Set default dates to today and +1 year
+  document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('productionDate').value = today;
+    document.getElementById('expiryDate').value = '';
+    updateTotalCount();
+    updateSummary();
+    showSection('stock-count'); // Show stock count by default
+  });
+
+  function updateTotalCount() {
+    document.getElementById('totalCountDisplay').textContent = `Total: ${entries.length}`;
+  }
+
+  function clearExpiryDate() {
+    document.getElementById('expiryDate').value = '';
+  }
+
+  function changeMode() {
+    currentMode = document.querySelector('input[name="mode"]:checked').value;
+
+    document.getElementById('qtyInput').disabled = (currentMode === 'direct');
+    document.getElementById('locationInput').disabled = (currentMode === 'direct');
+    document.getElementById('productionDate').disabled = (currentMode === 'direct');
+    document.getElementById('expiryDate').disabled = false; // Always editable
+
+    clearInputs();
+
+    if (currentMode === 'direct') {
+      document.getElementById('currentLocationDisplay').style.display = 'inline-block';
+      document.getElementById('currentLocationDisplay').innerText = `Current Location: ${currentLocation || '--'}`;
+    } else {
+      currentLocation = '';
+      document.getElementById('currentLocationDisplay').style.display = 'none';
+    }
+  }
+
+  function saveToLocal() {
+    localStorage.setItem('warehouseEntries', JSON.stringify(entries));
+    updateTotalCount();
+    updateSummary();
+  }
+
+  function isLocationCode(input) {
+    return /^[A-Za-z]{2}\d{6}$/.test(input);
+  }
+
+  function addEntry() {
+    const input = document.getElementById('barcodeInput').value.trim().toUpperCase();
+    let qty = currentMode === 'direct' ? 1 : parseInt(document.getElementById('qtyInput').value);
+    let location = document.getElementById('locationInput').value.trim();
+    let productionDate = document.getElementById('productionDate').value;
+    let expiryDate = document.getElementById('expiryDate').value;
+
+    // Auto-detect location format (2 letters + 6 digits)
+    if (isLocationCode(input)) {
+      if (currentMode === 'direct') {
+        currentLocation = input;
+        document.getElementById('currentLocationDisplay').innerText = `Current Location: ${currentLocation}`;
+        document.getElementById('barcodeInput').value = "";
+        return;
+      } else {
+        document.getElementById('locationInput').value = input;
+        document.getElementById('barcodeInput').value = "";
+        document.getElementById('barcodeInput').focus();
+        return;
+      }
+    }
+
+    if (currentMode === 'direct') {
+      if (!currentLocation) {
+        alert("Please scan a location first!");
+        return;
+      }
+      location = currentLocation;
+    }
+
+    const barcode = input;
+    if (!barcode || isNaN(qty) || !location || !productionDate) {
+      alert("Please fill all required fields (Barcode, Qty, Location, Production Date).");
+      return;
+    }
+
+    // Check if this barcode already exists at this location
+    const existingEntryIndex = entries.findIndex(entry => 
+      entry.barcode === barcode && 
+      entry.location === location &&
+      entry.productionDate === productionDate &&
+      entry.expiryDate === expiryDate
+    );
+
+    if (existingEntryIndex >= 0) {
+      // Update existing entry by adding the new quantity
+      entries[existingEntryIndex].qty += qty;
+      entries[existingEntryIndex].timestamp = new Date().toISOString();
+    } else {
+      // Add new entry with fresh serial number
+      entries.unshift({ 
+        serialNumber: serialNumber++,
+        barcode, 
+        qty, 
+        location, 
+        productionDate, 
+        expiryDate,
+        selected: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    saveToLocal();
+    filterTable(); // This will re-render with any current search filter
+    clearInputs();
+  }
+
+  function filterTable() {
+    const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+    
+    if (!searchTerm) {
+      filteredEntries = [...entries];
+    } else {
+      filteredEntries = entries.filter(entry => {
+        return Object.values(entry).some(value => {
+          if (value === null || value === undefined) return false;
+          return value.toString().toLowerCase().includes(searchTerm);
+        });
+      });
+    }
+    
+    renderTable();
+    updateSummary();
+  }
+
+  function updateSummary() {
+    // Calculate unique barcode count from filtered entries
+    const uniqueBarcodes = new Set(filteredEntries.map(entry => entry.barcode));
+    document.getElementById('uniqueBarcodeCount').textContent = uniqueBarcodes.size;
+    
+    // Calculate total quantity from filtered entries
+    const totalQuantity = filteredEntries.reduce((sum, entry) => sum + entry.qty, 0);
+    document.getElementById('totalQuantityScanned').textContent = totalQuantity;
+  }
+
+  function renderTable() {
+    const tbody = document.querySelector("#dataTable tbody");
+    tbody.innerHTML = "";
+
+    let hasSelected = false;
+
+    // Reassign serial numbers based on current position (1, 2, 3...)
+    filteredEntries.forEach((entry, index) => {
+      entry.serialNumber = index + 1;
+    });
+
+    filteredEntries.forEach((row, index) => {
+      const tr = document.createElement("tr");
+      if (row.selected) hasSelected = true;
+
+      if (editIndex === index) {
+        tr.innerHTML = `
+          <td></td>
+          <td>${row.serialNumber}</td>
+          <td><input type="text" value="${row.barcode}" id="edit-barcode-${index}" /></td>
+          <td><input type="number" value="${row.qty}" id="edit-qty-${index}" /></td>
+          <td><input type="text" value="${row.location}" id="edit-location-${index}" /></td>
+          <td><input type="date" value="${row.productionDate}" id="edit-production-${index}" /></td>
+          <td>
+            <input type="date" value="${row.expiryDate || ''}" id="edit-expiry-${index}" />
+            <button class="clear-date" onclick="document.getElementById('edit-expiry-${index}').value = ''">Clear</button>
+          </td>
+          <td>
+            <button class="save-btn" onclick="saveEdit(${index})">Save</button>
+            <button class="cancel-btn" onclick="cancelEdit()">Cancel</button>
+          </td>
+        `;
+      } else {
+        tr.innerHTML = `
+          <td><input type="checkbox" ${row.selected ? 'checked' : ''} onchange="toggleSelectRow(${index}, this.checked)"></td>
+          <td>${row.serialNumber}</td>
+          <td>${row.barcode}</td>
+          <td>${row.qty}</td>
+          <td>${row.location}</td>
+          <td>${formatDate(row.productionDate)}</td>
+          <td>${row.expiryDate ? formatDate(row.expiryDate) : 'N/A'}</td>
+          <td>
+            <button class="edit-btn" onclick="editRow(${index})">Edit</button>
+            <button class="delete-btn" onclick="deleteRow(${index})">Delete</button>
+          </td>
+        `;
+      }
+
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('deleteAllBtn').style.display = hasSelected ? 'block' : 'none';
+    document.getElementById('selectAll').checked = filteredEntries.length > 0 && filteredEntries.every(row => row.selected);
+  }
+
+  function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  }
+
+  function clearInputs() {
+    document.getElementById('barcodeInput').value = "";
+    if (currentMode !== 'direct') {
+      document.getElementById('qtyInput').value = "";
+      document.getElementById('locationInput').value = "";
+    }
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('productionDate').value = today;
+    document.getElementById('expiryDate').value = '';
+    document.getElementById('barcodeInput').focus();
+  }
+
+  document.getElementById('barcodeInput').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      addEntry();
+    }
+  });
+
+  function editRow(index) {
+    editIndex = index;
+    renderTable();
+  }
+
+  function saveEdit(index) {
+    const newBarcode = document.getElementById(`edit-barcode-${index}`).value.trim();
+    const newQty = parseInt(document.getElementById(`edit-qty-${index}`).value);
+    const newLocation = document.getElementById(`edit-location-${index}`).value.trim();
+    const newProduction = document.getElementById(`edit-production-${index}`).value;
+    const newExpiry = document.getElementById(`edit-expiry-${index}`).value;
+
+    if (!newBarcode || isNaN(newQty) || !newLocation || !newProduction) {
+      alert("Please fill all required fields (Barcode, Qty, Location, Production Date).");
+      return;
+    }
+
+    entries[index] = { 
+      ...entries[index], 
+      barcode: newBarcode, 
+      qty: newQty, 
+      location: newLocation,
+      productionDate: newProduction,
+      expiryDate: newExpiry || null
+    };
+    editIndex = -1;
+    saveToLocal();
+    filterTable(); // Re-render with current search filter
+  }
+
+  function cancelEdit() {
+    editIndex = -1;
+    renderTable();
+  }
+
+  function deleteRow(index) {
+    // Find the actual index in the entries array
+    const entryToDelete = filteredEntries[index];
+    const actualIndex = entries.findIndex(e => e.timestamp === entryToDelete.timestamp);
+    
+    if (actualIndex !== -1) {
+      entries.splice(actualIndex, 1);
+      saveToLocal();
+      filterTable(); // Re-render with current search filter
+    }
+  }
+
+  function toggleSelectRow(index, isChecked) {
+    filteredEntries[index].selected = isChecked;
+    
+    // Update the main entries array to match
+    const entryToUpdate = filteredEntries[index];
+    const actualIndex = entries.findIndex(e => e.timestamp === entryToUpdate.timestamp);
+    if (actualIndex !== -1) {
+      entries[actualIndex].selected = isChecked;
+    }
+    
+    saveToLocal();
+    renderTable();
+  }
+
+  function toggleSelectAll(isChecked) {
+    filteredEntries.forEach(entry => {
+      entry.selected = isChecked;
+      
+      // Update the main entries array to match
+      const actualIndex = entries.findIndex(e => e.timestamp === entry.timestamp);
+      if (actualIndex !== -1) {
+        entries[actualIndex].selected = isChecked;
+      }
+    });
+    
+    saveToLocal();
+    renderTable();
+  }
+
+  function deleteSelected() {
+    if (confirm("Are you sure you want to delete all selected items?")) {
+      // Get timestamps of selected entries in filtered view
+      const selectedTimestamps = filteredEntries
+        .filter(entry => entry.selected)
+        .map(entry => entry.timestamp);
+      
+      // Remove from main entries array
+      entries = entries.filter(entry => !selectedTimestamps.includes(entry.timestamp));
+      
+      saveToLocal();
+      filterTable(); // Re-render with current search filter
+    }
+  }
+
+  function downloadExcel(type) {
+    let ws_data;
+    const dataToExport = type === 'standard' ? entries : filteredEntries;
+    
+    if (type === 'standard') {
+      ws_data = [
+        ["#", "Barcode", "Qty", "Location", "Production Date", "Expiry Date"],
+        ...dataToExport.map(row => [
+          row.serialNumber,
+          row.barcode, 
+          row.qty, 
+          row.location,
+          formatDate(row.productionDate),
+          row.expiryDate ? formatDate(row.expiryDate) : 'N/A'
+        ])
+      ];
+    } else {
+      const consolidated = {};
+      
+      dataToExport.forEach(row => {
+        if (!consolidated[row.barcode]) {
+          consolidated[row.barcode] = {
+            qty: 0,
+            locations: new Set(),
+            productionDates: new Set(),
+            expiryDates: new Set()
+          };
+        }
+        consolidated[row.barcode].qty += row.qty;
+        consolidated[row.barcode].locations.add(row.location);
+        consolidated[row.barcode].productionDates.add(formatDate(row.productionDate));
+        if (row.expiryDate) {
+          consolidated[row.barcode].expiryDates.add(formatDate(row.expiryDate));
+        }
+      });
+      
+      ws_data = [
+        ["Barcode", "Total Qty", "Locations", "Production Dates", "Expiry Dates"],
+        ...Object.entries(consolidated).map(([barcode, data]) => [
+          barcode, 
+          data.qty, 
+          Array.from(data.locations).join(', '),
+          Array.from(data.productionDates).join(', '),
+          Array.from(data.expiryDates).join(', ') || 'N/A'
+        ])
+      ];
+    }
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    XLSX.utils.book_append_sheet(wb, ws, "Warehouse Report");
+    XLSX.writeFile(wb, `warehouse_report_${type}.xlsx`);
+  }
+</script>
+</body>
+</html>
